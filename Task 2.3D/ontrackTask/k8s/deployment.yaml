@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ontrack-task-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ontrack-task
+  template:
+    metadata:
+      labels:
+        app: ontrack-task
+    spec:
+      containers:
+      - name: ontrack-task
+        image: ontrack-task-app:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8000
