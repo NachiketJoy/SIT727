@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo
+spec:
+  serviceName: mongo
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      containers:
+      - name: mongo
+        image: mongo:6
+        command: ["bash", "-c"]
+        args:
+          - |
+            if [ ! -f /data/db/.init ]; then
+              echo "Running first-time init..."
+
+              # 1. Start MongoDB WITHOUT replica set
+              mongod --bind_ip_all --fork --logpath /var/log/mongodb.log
+              sleep 5
+
+              # 2. Create root user
+              mongosh admin --eval "db.createUser({user: 'root', pwd: '$MONGO_INITDB_ROOT_PASSWORD', roles:[{role:'root',db:'admin'}]})"
+
+              # 3. Mark initialization complete
+              touch /data/db/.init
+
+              # 4. Shutdown
+              mongod --shutdown
+            fi
+
+            # 5. Start MongoDB WITH replica set
+            exec mongod --replSet rs0 --bind_ip_all
+        ports:
+          - containerPort: 27017
+        volumeMounts:
+          - name: mongo-data
+            mountPath: /data/db
+        env:
+          - name: MONGO_INITDB_ROOT_USERNAME
+            value: root
+          - name: MONGO_INITDB_ROOT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: pet-secret
+                key: MONGO_INITDB_ROOT_PASSWORD
+  volumeClaimTemplates:
+    - metadata:
+        name: mongo-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
